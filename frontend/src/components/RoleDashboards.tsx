@@ -1976,6 +1976,22 @@ export const TeacherDashboard: React.FC<DashboardProps> = ({ user, token }) => {
   // Filter students under selected active class
   const classStudents = showAllStudents ? students : (activeClass ? students.filter(s => s.classGroup === activeClass.className && s.section === activeClass.section) : []);
 
+  // ── Class Summary Bar stats (Issue #172) ──────────────────────────
+  // Mirrors the calculation patterns used in PanelViews.tsx performance panel.
+  const totalStudents = classStudents.length;
+  const assessedStudents = classStudents.filter(s => s.levelHistory.length > 0).length;
+  const pendingStudents = totalStudents - assessedStudents;
+  const atAboveTarget = assessedStudents > 0
+    ? classStudents.filter(s => s.levelHistory.length > 0 && s.currentLevel >= s.targetLevel).length
+    : 0;
+  const atAboveTargetPct = assessedStudents > 0 ? Math.round((atAboveTarget / assessedStudents) * 100) : 0;
+  const regressedStudents = classStudents.filter(s => {
+    if (s.levelHistory.length < 2) return false;
+    const last = s.levelHistory[s.levelHistory.length - 1];
+    const prev = s.levelHistory[s.levelHistory.length - 2];
+    return last.level < prev.level;
+  }).length;
+
   if (showWorksheetPortal) {
     const effectiveClass = activeClass || (classes.length > 0 ? classes[0] : null);
     if (effectiveClass) {
@@ -2114,6 +2130,38 @@ export const TeacherDashboard: React.FC<DashboardProps> = ({ user, token }) => {
           </div>
         </form>
       )}
+
+      {/* ── Class Summary Bar (Issue #172) ────────────────────────── */}
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4" id="class-summary-bar">
+        <MetricCard
+          title="Total Students"
+          value={totalStudents}
+          subtext="Active roster"
+          icon={Users}
+          loading={students.length === 0}
+        />
+        <MetricCard
+          title="Assessed"
+          value={`${assessedStudents} / ${totalStudents}`}
+          subtext={`${pendingStudents} pending diagnostic`}
+          icon={CheckCircle2}
+          loading={students.length === 0}
+        />
+        <MetricCard
+          title="At / Above Target"
+          value={assessedStudents > 0 ? `${atAboveTargetPct}%` : '\u2014'}
+          subtext={`${atAboveTarget} of ${assessedStudents} assessed students`}
+          icon={Award}
+          loading={students.length === 0}
+        />
+        <MetricCard
+          title="Needs Attention"
+          value={regressedStudents}
+          subtext="Regressed from prior level"
+          icon={ShieldAlert}
+          loading={students.length === 0}
+        />
+      </div>
 
       {/* Class picker tabs */}
       <div className="flex gap-2 border-b border-zinc-200 dark:border-zinc-700 pb-px">
